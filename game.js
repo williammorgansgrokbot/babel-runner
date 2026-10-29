@@ -75,7 +75,7 @@ const M = {
   lantern: noOutline(new THREE.MeshBasicMaterial({ color: 0xffe066 })),
   rope: new THREE.LineBasicMaterial({ color: 0x6b4a2e }),
 };
-function spriteMat(tex) { return noOutline(new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, fog: true })); }
+function spriteMat(tex) { return noOutline(new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.45, side: THREE.DoubleSide, fog: true, toneMapped: false })); }
 const planeG = new THREE.PlaneGeometry(1, 1); planeG.translate(0, 0.5, 0);
 const planeC = new THREE.PlaneGeometry(1, 1);
 // billboard of given height (keeps texture aspect once loaded)
@@ -174,11 +174,13 @@ function buildSegBase(g) {
 }
 function buildDecor(kind) {
   const g = new THREE.Group();
-  if (kind === 'scaffold') { billboard('scaffold', 5.5, g, -3.2, rand(-3, 3)); }
-  if (kind === 'palm') { billboard('palm', 2.4, g, -3.3, rand(-4, 4)); }
-  if (kind === 'crane') { billboard('crane', 4.2, g, -3.1, rand(-3, 3)); }
-  if (kind === 'worker') { billboard('worker', 2.5, g, -3.2, rand(-4, 4)); }
-  if (kind === 'bricks') { billboard('bricks', 1.5, g, -3.2, rand(-4, 4)); billboard('bucket', 1, g, -3.3, rand(-4, 4)); }
+  // props stand against the wall (face at x=-3.9), angled so their full width stays between wall and inner lane
+  const prop = (n, h, z) => { const b = billboard(n, h, g, 0, z); const hw = b.scale.x / 2 * Math.cos(1.05); b.position.x = -3.75 + hw; b.userData.fixed = 1.05; return b; };
+  if (kind === 'scaffold') prop('scaffold', 4.4, rand(-3, 3));
+  if (kind === 'palm') prop('palm', 2.2, rand(-4, 4));
+  if (kind === 'crane') prop('crane', 3.6, rand(-3, 3));
+  if (kind === 'worker') prop('worker', 2.4, rand(-4, 4));
+  if (kind === 'bricks') { prop('bricks', 1.4, rand(-4, -1)); prop('bucket', 1, rand(1, 4)); }
   return g;
 }
 function buildBanners() {
@@ -622,7 +624,7 @@ function update(dt) {
     const air = S.y > 0.01, sl = S.sliding > 0;
     if (sl) { P.setFrame('slide', 1.45); P.body.position.y = 0; }
     else if (air) { P.setFrame('jump', 2.35); P.body.position.y = 0; }
-    else { const f = Math.floor(animT / 1.6) % 2; P.setFrame(f ? 'run1' : 'run0', 2.3); P.body.position.y = Math.abs(Math.sin(animT * 0.98)) * 0.12; P.sprite.scale.x *= f ? -1 : 1; }
+    else { const f = Math.floor(animT / 1.6) % 2; P.setFrame(f ? 'run1' : 'run0', 2.3); P.body.position.y = Math.abs(Math.sin(animT * 0.98)) * 0.12; }
     P.body.rotation.z = P.lean * 0.18;
   }
   P.blob.scale.setScalar(1 - Math.min(0.6, S.y * 0.2));
@@ -677,7 +679,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && S.s
 function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   if (S.state !== 'paused') update(dt);
-  for (const b of billboards) { if (!b.parent?.visible && b.parent !== scene) continue; b.getWorldPosition(_wp); b.rotation.y = Math.atan2(camera.position.x - _wp.x, camera.position.z - _wp.z) * 0.6; }
+  for (const b of billboards) { if (!b.parent?.visible && b.parent !== scene) continue; if (b.userData.fixed != null) { b.rotation.y = b.userData.fixed; continue; } _wp.copy(camera.position); b.parent.worldToLocal(_wp); const lim = b.userData.lim ?? 0.35; b.rotation.y = Math.max(-lim, Math.min(lim, Math.atan2(_wp.x - b.position.x, _wp.z - b.position.z) * 0.6)); }
   if (useOutline) outline.render(scene, camera); else renderer.render(scene, camera);
   adaptQuality(dt);
   requestAnimationFrame(frame);
@@ -686,4 +688,4 @@ const _wp = new THREE.Vector3(); if (Q.has('nooutline')) useOutline = false;
 initClouds(); S.state = 'menu'; show('loading', false);
 // spawn a few attract-mode items on menu
 frame();
-window.__game = { S, startGame, act, Sfx };
+window.__game = { S, startGame, act, Sfx, spawnOb, spawnItem };
