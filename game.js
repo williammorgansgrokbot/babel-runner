@@ -119,7 +119,7 @@ const PANO_Y0 = -PANO_H * 0.05 - 10;
 const tower = new THREE.Group(); tower.position.copy(C); scene.add(tower);
 const coreTex = TX.sand.clone(); coreTex.wrapS = coreTex.wrapT = THREE.RepeatWrapping; coreTex.repeat.set(Math.round(2 * Math.PI * (R - 6) / 1.7), 120); coreTex.needsUpdate = true;
 const core = new THREE.Mesh(new THREE.CylinderGeometry(R - 6, R - 6, 192, 72, 1, true), toon({ map: coreTex, color: 0xf6dcc0 })); core.position.y = 60; tower.add(core);
-const below = new THREE.Mesh(new THREE.CylinderGeometry(R + 4.4, R + 4.4, 192, 72, 1, true), toon({ map: coreTex, color: 0xd9b090 })); below.position.y = -110; tower.add(below);
+const below = new THREE.Mesh(new THREE.CylinderGeometry(R + 3.9, R + 3.9, 192, 72, 1, true), toon({ map: coreTex, color: 0xd9b090 })); below.position.y = -110; tower.add(below);
 const ledges = new THREE.Group(); tower.add(ledges);
 for (let k = 0; k < 8; k++) { const y = 16 + k * 16; const l = mesh(new THREE.CylinderGeometry(R - 4.2, R - 4.2, 1.2, 72), M.sandD, 0, y, 0, ledges, false); const t2 = mesh(new THREE.CylinderGeometry(R - 5.2, R - 4.6, 0.8, 72), M.sandW, 0, y + 1, 0, ledges, false); }
 for (let k = 0; k < 6; k++) { mesh(new THREE.CylinderGeometry(R + 5.2, R + 5.2, 1.2, 72, 1, true), M.sandD, 0, -18 - k * 16, 0, ledges, false); }
@@ -197,12 +197,52 @@ const decorRoot = new THREE.Group(); scene.add(decorRoot);
 const KINDS = ['none', 'scaffold', 'palm', 'crane', 'worker', 'bricks', 'none'];
 for (let i = 0; i < SEG_N; i++) {
   const seg = { g: new THREE.Group(), D: [], banner: buildBanners(), z: 10 - i * SEG_LEN };
-  buildSegBase(seg.g);
   for (const k of KINDS) { const d = buildDecor(k); seg.D.push(d); seg.g.add(d); }
   seg.g.add(seg.banner);
   randomizeSeg(seg, i < 2); place(seg.g, 0, 0, seg.z, true);
   decorRoot.add(seg.g); segments.push(seg);
 }
+
+// ---------- Continuous curved ramp (one swept mesh along the spiral; no per-segment seams) ----------
+const HLP = 70;                 // screw period: multiple of brick tile (1.75), merlon spacing (3.5) and facade tile (7)
+const HZ0 = 40, HZ1 = -230 - HLP; // logical z range covered (behind .. ahead)
+function helixTex(t, rx = 1) { const c = t.clone(); c.wrapS = c.wrapT = THREE.RepeatWrapping; c.repeat.set(rx, 1); c.needsUpdate = true; return c; }
+const HM = {
+  floor: toon({ map: helixTex(TX.sand), color: 0xfff0dc }), mass: toon({ map: helixTex(TX.sand), color: 0xd6a37c }),
+  par: toon({ map: helixTex(TX.sand), color: 0xffe4cc }), facade: toon({ map: helixTex(TX.facade) }),
+};
+function hpt(x, y, z) { const th = -z / R, r = R + x; return [-R + r * Math.cos(th) + R, y - z * SL, -r * Math.sin(th)]; } // relative to tower centre C
+// sweep a polyline profile [[x,y],...] along logical z; uv: u = arc/uS, v = profile length/vS
+function sweep(profile, mat, uS = 1.75, vS = 1.75, step = 1) {
+  const pos = [], uv = [], idx = []; const nz = Math.ceil((HZ0 - HZ1) / step);
+  for (let p = 0; p < profile.length - 1; p++) {
+    const [x0, y0] = profile[p], [x1, y1] = profile[p + 1];
+    let v0 = 0; for (let q = 0; q < p; q++) v0 += Math.hypot(profile[q + 1][0] - profile[q][0], profile[q + 1][1] - profile[q][1]);
+    const v1 = v0 + Math.hypot(x1 - x0, y1 - y0); const base = pos.length / 3;
+    for (let i = 0; i <= nz; i++) {
+      const z = HZ0 - i * step, s = -z;
+      pos.push(...hpt(x0, y0, z), ...hpt(x1, y1, z));
+      const ua = s / uS; uv.push(ua, v0 / vS, ua, v1 / vS);
+      if (i) { const a = base + (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    }
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  const m = new THREE.Mesh(g, mat); m.receiveShadow = true; m.castShadow = true; return m;
+}
+const helix = new THREE.Group(); helix.position.copy(C); scene.add(helix);
+helix.add(sweep([[-4.2, 0], [4.45, 0]], HM.floor));                                  // ramp floor
+helix.add(sweep([[4.45, 0], [4.45, -26]], HM.mass));                                  // outer face of ramp mass
+helix.add(sweep([[3.8, 0], [3.8, 0.9], [4.5, 0.9], [4.5, 0]], HM.par));               // continuous parapet
+helix.add(sweep([[-3.9, 11], [-3.9, 0]], HM.facade, 7, 11));                          // inner tower wall (facade)
+helix.add(sweep([[-6.5, 11.7], [-3.4, 11.7], [-3.4, 11]], HM.mass));                 // cornice
+// merlons on parapet + wall top, fixed in the spiral's frame
+for (let z = HZ0; z > HZ1; z -= 3.5) {
+  for (const [x, y, w, h, d, mat] of [[4.15, 1.15, 0.8, 0.5, 1.1, M.sandW], [-3.65, 12.05, 0.9, 0.7, 1.2, M.sand]]) {
+    if (x < 0 && Math.round((HZ0 - z) / 3.5) % 2) continue;
+    const m = boxM(w, h, d, mat, 0, 0, 0, helix, true, 0.15); const [px, py, pz] = hpt(x, y, z); m.position.set(px, py, pz); m.rotation.set(Math.atan(SL), -z / R, 0, 'YXZ');
+  }
+}
+function updateHelix() { const wd = S.worldDist || 0, wm = wd % HLP, k = wd - wm; helix.rotation.y = -wm / R; helix.position.y = -wm * SL; }
 function randomizeSeg(seg, plain) {
   const a = plain ? 0 : (Math.random() * KINDS.length) | 0;
   seg.D.forEach((o, k) => o.visible = k === a);
@@ -641,7 +681,7 @@ function update(dt) {
   if (S.shake > 0) { S.shake -= dt; camera.position.x += rand(-1, 1) * S.shake * 0.4; camera.position.y += rand(-1, 1) * S.shake * 0.3; }
   camera.lookAt(curLook);
   sky.position.copy(camera.position); pano.position.x = camera.position.x; pano.position.z = camera.position.z;
-  updateTower(dt);
+  updateTower(dt); updateHelix();
 
   if (toastT > 0) { toastT -= dt; if (toastT <= 0) $('toast').classList.remove('show'); }
   if (playing) updateHUD();
