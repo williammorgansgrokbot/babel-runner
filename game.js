@@ -447,20 +447,22 @@ const S = {
 const BASE_SPEED = 15, MAX_SPEED = 36, GRAV = 40, JUMP_V = 13.2;
 const DUR = { sandals: 6, shield: 14, magnet: 10 };
 const VERSES = [
-  ['And the whole earth was of one language, and of one speech.', 'Genesis 11:1'],
-  ['Go to, let us make brick, and burn them throughly. And they had brick for stone, and slime had they for morter.', 'Genesis 11:3'],
-  ['Go to, let us build us a city and a tower, whose top may reach unto heaven; and let us make us a name.', 'Genesis 11:4'],
-  ['And the LORD came down to see the city and the tower, which the children of men builded.', 'Genesis 11:5'],
-  ['Therefore is the name of it called Babel; because the LORD did there confound the language of all the earth.', 'Genesis 11:9'],
-  ['Except the LORD build the house, they labour in vain that build it.', 'Psalm 127:1'],
-  ['Pride goeth before destruction, and an haughty spirit before a fall.', 'Proverbs 16:18'],
-  ['The name of the LORD is a strong tower: the righteous runneth into it, and is safe.', 'Proverbs 18:10'],
-  ['Humble yourselves in the sight of the Lord, and he shall lift you up.', 'James 4:10'],
-  ['They that wait upon the LORD shall renew their strength; they shall mount up with wings as eagles.', 'Isaiah 40:31'],
-  ['And suddenly there came a sound from heaven... and they were all filled with the Holy Ghost, and began to speak with other tongues.', 'Acts 2:2-4'],
-  ['For which of you, intending to build a tower, sitteth not down first, and counteth the cost?', 'Luke 14:28'],
+  ['The whole world had only one language, and everyone spoke it.', 'Genesis 11:1'],
+  ['They said to one another, “Come on! Let’s make bricks and bake them well.” They used bricks instead of stones. They used tar to hold the bricks together.', 'Genesis 11:3'],
+  ['Then they said, “Come on! Let’s build a city for ourselves. Let’s build a tower that reaches to the sky. We’ll make a name for ourselves. Then we won’t be scattered over the whole earth.”', 'Genesis 11:4'],
+  ['But the Lord came down to see the city and the tower the people were building.', 'Genesis 11:5'],
+  ['There the Lord mixed up the language of the whole world. That’s why the city was called Babel. From there the Lord scattered them over the whole earth.', 'Genesis 11:9'],
+  ['If the Lord doesn’t build a house, the work of the builders is useless. If the Lord doesn’t watch over a city, it’s useless for those on guard duty to stand watch over it.', 'Psalm 127:1'],
+  ['If you are proud, you will be destroyed. If you are proud, you will fall.', 'Proverbs 16:18'],
+  ['The name of the Lord is like a strong tower. Godly people run to it and are safe.', 'Proverbs 18:10'],
+  ['Be humble in front of the Lord. And he will lift you up.', 'James 4:10'],
+  ['But those who trust in the Lord will receive new strength. They will fly as high as eagles. They will run and not get tired. They will walk and not grow weak.', 'Isaiah 40:31'],
+  ['Suddenly a sound came from heaven. It was like a strong wind blowing. It filled the whole house where they were sitting. They saw something that looked like fire in the shape of tongues. The flames separated and came to rest on each of them. All of them were filled with the Holy Spirit. They began to speak in languages they had not known before. The Spirit gave them the ability to do this.', 'Acts 2:2-4'],
+  ['Suppose one of you wants to build a tower. Won’t you sit down first and figure out how much it will cost? Then you will see whether you have enough money to finish it.', 'Luke 14:28'],
 ];
 
+function fitOver(){const ov=$('over'),q=$('verse');if(!ov||!q)return;q.style.fontSize='';let f=parseFloat(getComputedStyle(q).fontSize);while(ov.scrollHeight>ov.clientHeight+1&&f>11){f-=.5;q.style.fontSize=f+'px'}}
+addEventListener('resize',()=>{if($('over')&&!$('over').classList.contains('hidden'))fitOver()});
 function clearWorld() {
   for (const o of obstacles) { o.g.visible = false; obPool[o.type].push(o); } obstacles.length = 0;
   for (const it of items) { it.g.visible = false; itemPool[it.kind].push(it); } items.length = 0;
@@ -550,8 +552,8 @@ function gameOver() {
   $('fScore').textContent = sc.toLocaleString(); $('fCoins').textContent = S.coins; $('fDist').textContent = Math.floor((S.climb || 0) * 2) + " cubits";
   $('bestOver').textContent = S.best.toLocaleString(); $('bestMenu').textContent = S.best.toLocaleString(); show('newBest', nb);
   const showV = localStorage.getItem('br_verse') !== '0'; $('verseToggle').checked = showV;
-  const v = pick(VERSES); $('verse').innerHTML = `&ldquo;${v[0]}&rdquo;<cite>${v[1]} (KJV)</cite>`; show('verse', showV);
-  show('over', true);
+  const v = pick(VERSES); $('verse').innerHTML = `&ldquo;${v[0]}&rdquo;<cite>${v[1]} (NIrV)</cite><small class="nirv-note">Scripture quotations taken from The Holy Bible, New International Reader&#39;s Version®, NIrV® Copyright © 1995, 1996, 1998, 2014 by Biblica, Inc.® Used by permission. All rights reserved worldwide.</small>`; show('verse', showV);
+  show('over', true); requestAnimationFrame(fitOver);
 }
 function togglePause() {
   if (S.state === 'play') { S.state = 'paused'; show('paused', true); if (Sfx.ctx) Sfx.ctx.suspend(); }
